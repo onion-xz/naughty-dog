@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Endless Runner Clone - Relaxed Speed</title>
+    <title>Endless Runner - Custom Images Edition</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -19,18 +19,16 @@
 
         .controls {
             margin-bottom: 15px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
         }
 
-        select, button {
+        button {
             padding: 8px 16px;
             font-size: 14px;
             border-radius: 4px;
             border: 1px solid #ccc;
             background: white;
             cursor: pointer;
+            font-weight: bold;
         }
 
         button:hover {
@@ -53,14 +51,7 @@
 <body>
 
     <div class="controls">
-        <label for="charSelect"><strong>Choose Character:</strong></label>
-        <select id="charSelect">
-            <option value="🦖">Dino (🦖)</option>
-            <option value="🐱">Cat (🐱)</option>
-            <option value="🤖">Robot (🤖)</option>
-            <option value="🍕">Pizza (🍕)</option>
-        </select>
-        <button id="restartBtn">Restart</button>
+        <button id="restartBtn">Restart Game</button>
     </div>
 
     <canvas id="gameCanvas" width="800" height="250"></canvas>
@@ -70,30 +61,32 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const charSelect = document.getElementById('charSelect');
         const restartBtn = document.getElementById('restartBtn');
 
         // Game Configuration & State
         let score = 0;
         let isGameOver = false;
-        
-        // --- SPEED TWEAK 1: Lowered initial speed from 6 to 3.5 ---
-        let gameSpeed = 3.5; 
-        
+        let gameSpeed = 3.5; // Smooth, relaxed starting speed
         let obstacles = [];
         let spawnTimer = 0;
+
+        // --- IMAGE LOADING ---
+        const charImage = new Image();
+        charImage.src = 'character.png'; // Your player asset
+
+        const obstacleImage = new Image();
+        obstacleImage.src = 'obstacle.png'; // Your obstacle asset
 
         // Player configuration
         const player = {
             x: 50,
-            y: 190,
-            width: 40,
-            height: 40,
-            gravity: 0.6,
+            y: 145,
+            width: 60,       // Doubled size (was 45)
+            height: 60,      // Doubled size (was 45)
+            gravity: 0.5,
             velocity: 0,
             jumpStrength: -12,
-            isGrounded: true,
-            character: '🦖'
+            isGrounded: true
         };
 
         // Base ground level coordinate
@@ -118,11 +111,6 @@
             if (isGameOver) restartGame();
         });
 
-        charSelect.addEventListener('change', (e) => {
-            player.character = e.target.value;
-            canvas.focus(); 
-        });
-
         restartBtn.addEventListener('click', () => {
             restartGame();
             canvas.focus();
@@ -139,10 +127,13 @@
         class Obstacle {
             constructor() {
                 this.x = canvas.width;
+                
+                // You can keep these random width/height fields, or change them to fixed numbers 
+                // (e.g., this.width = 30; this.height = 30;) if your asset stretches too much.
                 this.width = 20 + Math.random() * 20; 
-                this.height = 30 + Math.random() * 30; 
+                this.height = 15 + Math.random() * 15; // Halved height constraints
+                
                 this.y = groundY - this.height;
-                this.color = '#ff4757';
             }
 
             update() {
@@ -150,18 +141,21 @@
             }
 
             draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                // Renders custom obstacle image asset
+                ctx.drawImage(
+                    obstacleImage, 
+                    this.x, 
+                    this.y, 
+                    this.width, 
+                    this.height
+                );
             }
         }
 
         function restartGame() {
             score = 0;
             isGameOver = false;
-            
-            // --- SPEED TWEAK 2: Reset to slower speed on restart ---
             gameSpeed = 3.5; 
-            
             obstacles = [];
             player.y = groundY - player.height;
             player.velocity = 0;
@@ -193,8 +187,6 @@
 
             // 3. Spawn Obstacles
             spawnTimer++;
-            
-            // --- SPEED TWEAK 3: Increased minimum spawn frames from 40 to 75 so blocks don't bunch up ---
             if (spawnTimer > Math.max(75, 120 - gameSpeed * 2)) { 
                 obstacles.push(new Obstacle());
                 spawnTimer = 0;
@@ -205,7 +197,7 @@
                 obstacles[i].update();
                 obstacles[i].draw();
 
-                // Collision Check
+                // Collision Check (AABB bounding box strategy)
                 if (
                     player.x < obstacles[i].x + obstacles[i].width &&
                     player.x + player.width > obstacles[i].x &&
@@ -215,12 +207,11 @@
                     isGameOver = true;
                 }
 
-                // Delete off-screen items to save memory
+                // Delete off-screen items to save system memory
                 if (obstacles[i].x + obstacles[i].width < 0) {
                     obstacles.splice(i, 1);
                     score++;
-                    
-                    // --- SPEED TWEAK 4: Only increases speed every 10 points (was 5) and by a tiny 0.15 amount (was 0.5) ---
+                    // Smooth scaling difficulty curve
                     if (score % 10 === 0) gameSpeed += 0.15;
                 }
             }
@@ -233,11 +224,14 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // 6. Draw Player 
-            ctx.font = `${player.height}px Arial`;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(player.character, player.x, player.y);
+            // 6. Draw Custom Player Image
+            ctx.drawImage(
+                charImage, 
+                player.x, 
+                player.y, 
+                player.width, 
+                player.height
+            );
 
             // 7. Draw Live Score Dashboard
             ctx.fillStyle = '#333';
@@ -260,7 +254,7 @@
             ctx.fillText('Press Spacebar or click Restart to Try Again', canvas.width / 2, canvas.height / 2 + 25);
         }
 
-        // Initialize game on window load
+        // Initialize game loop configuration
         gameLoop();
     </script>
 </body>
