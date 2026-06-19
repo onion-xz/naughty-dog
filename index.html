@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endless Runner Clone - Relaxed Speed</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select, button {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #eee;
+        }
+
+        canvas {
+            background-color: #ffffff;
+            border: 2px solid #333;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .instructions {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <label for="charSelect"><strong>Choose Character:</strong></label>
+        <select id="charSelect">
+            <option value="🦖">Dino (🦖)</option>
+            <option value="🐱">Cat (🐱)</option>
+            <option value="🤖">Robot (🤖)</option>
+            <option value="🍕">Pizza (🍕)</option>
+        </select>
+        <button id="restartBtn">Restart</button>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="250"></canvas>
+
+    <div class="instructions">Press <strong>Spacebar</strong> or <strong>Click/Tap</strong> the canvas to jump.</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const charSelect = document.getElementById('charSelect');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Game Configuration & State
+        let score = 0;
+        let isGameOver = false;
+        
+        // --- SPEED TWEAK 1: Lowered initial speed from 6 to 3.5 ---
+        let gameSpeed = 3.5; 
+        
+        let obstacles = [];
+        let spawnTimer = 0;
+
+        // Player configuration
+        const player = {
+            x: 50,
+            y: 190,
+            width: 40,
+            height: 40,
+            gravity: 0.6,
+            velocity: 0,
+            jumpStrength: -12,
+            isGrounded: true,
+            character: '🦖'
+        };
+
+        // Base ground level coordinate
+        const groundY = canvas.height - 60;
+
+        // Event Listeners
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                triggerJump();
+                if (isGameOver) restartGame();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); 
+            triggerJump();
+            if (isGameOver) restartGame();
+        });
+
+        canvas.addEventListener('mousedown', () => {
+            triggerJump();
+            if (isGameOver) restartGame();
+        });
+
+        charSelect.addEventListener('change', (e) => {
+            player.character = e.target.value;
+            canvas.focus(); 
+        });
+
+        restartBtn.addEventListener('click', () => {
+            restartGame();
+            canvas.focus();
+        });
+
+        function triggerJump() {
+            if (player.isGrounded && !isGameOver) {
+                player.velocity = player.jumpStrength;
+                player.isGrounded = false;
+            }
+        }
+
+        // Obstacle Base Class
+        class Obstacle {
+            constructor() {
+                this.x = canvas.width;
+                this.width = 20 + Math.random() * 20; 
+                this.height = 30 + Math.random() * 30; 
+                this.y = groundY - this.height;
+                this.color = '#ff4757';
+            }
+
+            update() {
+                this.x -= gameSpeed;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        function restartGame() {
+            score = 0;
+            isGameOver = false;
+            
+            // --- SPEED TWEAK 2: Reset to slower speed on restart ---
+            gameSpeed = 3.5; 
+            
+            obstacles = [];
+            player.y = groundY - player.height;
+            player.velocity = 0;
+            player.isGrounded = true;
+            spawnTimer = 0;
+            gameLoop();
+        }
+
+        // Primary Physics & Rendering Loop
+        function gameLoop() {
+            if (isGameOver) {
+                drawGameOver();
+                return;
+            }
+
+            // 1. Clear Screen
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Handle Player Physics (Gravity)
+            player.velocity += player.gravity;
+            player.y += player.velocity;
+
+            // Check ground collision
+            if (player.y >= groundY - player.height) {
+                player.y = groundY - player.height;
+                player.velocity = 0;
+                player.isGrounded = true;
+            }
+
+            // 3. Spawn Obstacles
+            spawnTimer++;
+            
+            // --- SPEED TWEAK 3: Increased minimum spawn frames from 40 to 75 so blocks don't bunch up ---
+            if (spawnTimer > Math.max(75, 120 - gameSpeed * 2)) { 
+                obstacles.push(new Obstacle());
+                spawnTimer = 0;
+            }
+
+            // 4. Update and Draw Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].update();
+                obstacles[i].draw();
+
+                // Collision Check
+                if (
+                    player.x < obstacles[i].x + obstacles[i].width &&
+                    player.x + player.width > obstacles[i].x &&
+                    player.y < obstacles[i].y + obstacles[i].height &&
+                    player.y + player.height > obstacles[i].y
+                ) {
+                    isGameOver = true;
+                }
+
+                // Delete off-screen items to save memory
+                if (obstacles[i].x + obstacles[i].width < 0) {
+                    obstacles.splice(i, 1);
+                    score++;
+                    
+                    // --- SPEED TWEAK 4: Only increases speed every 10 points (was 5) and by a tiny 0.15 amount (was 0.5) ---
+                    if (score % 10 === 0) gameSpeed += 0.15;
+                }
+            }
+
+            // 5. Draw Environmental Details (Ground Line)
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 6. Draw Player 
+            ctx.font = `${player.height}px Arial`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(player.character, player.x, player.y);
+
+            // 7. Draw Live Score Dashboard
+            ctx.fillStyle = '#333';
+            ctx.font = '20px sans-serif';
+            ctx.fillText(`Score: ${score}`, 20, 20);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 30px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 10);
+            
+            ctx.font = '16px sans-serif';
+            ctx.fillText('Press Spacebar or click Restart to Try Again', canvas.width / 2, canvas.height / 2 + 25);
+        }
+
+        // Initialize game on window load
+        gameLoop();
+    </script>
+</body>
+</html>
